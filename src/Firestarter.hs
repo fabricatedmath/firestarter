@@ -4,10 +4,6 @@
 
 module Firestarter where
 
-import Data.Word
-
-import Linear
-
 class Firestarter o f a | o -> f, o -> a where
   isInside :: o -> f a -> Bool
   distanceAndDirection :: o -> f a -> (a, f a)

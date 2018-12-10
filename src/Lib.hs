@@ -4,19 +4,17 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE Rank2Types #-}
 
-module Lib (centerToCornerPoints, stepFire, fromGrid, toGrid, corners, B(..), stepFire') where
+module Lib (stepFire') where
 
 import Control.DeepSeq
 
 import Data.Bits
-import Data.Hashable
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Vector.Unboxed as U
 import Data.Word
 
 import qualified Data.Array.Repa as R
-import qualified Data.Array.Repa.Repr.Vector as R
 
 import Linear
 
@@ -82,13 +80,6 @@ centerToCorners (c,B a b _)
     (cs,mask) = cornersWithMask
     b' = complement $ b .&. mask
 
-centerToCornerPoints
-  :: (Corners (f Int), Num (f Int))
-  => (f Int, B)
-  -> [(Bool, f Int)]
-centerToCornerPoints (c,B a _ _) =
-  zip (map (testBit a) [0..]) $ map (c-) corners
-
 stepFire'
   :: Julia
   -> Double
@@ -128,7 +119,7 @@ stepFire' j e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
           m'' = M.map decrementTTL m'
         closed' <-
           fmap R.toUnboxed $ R.computeUnboxedP $
-          R.map (lookupEdge e e juliaDistance) $
+          R.map (lookupEdge e juliaDistance) $
           toRepa $ U.fromList $ concatMap toCubeCases $
           M.toList $ M.filter (\(B _ b _) -> b == mask) out
         closed' `deepseq` ps' `deepseq` m'' `deepseq` return ()
@@ -141,8 +132,8 @@ stepFire' j e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
 toRepa :: U.Unbox a => U.Vector a -> R.Array R.U R.DIM1 a
 toRepa v = R.fromUnboxed (R.Z R.:. U.length v) v
 
-lookupEdge :: Double -> Double -> (V3 Double -> Double) -> (V3 Int, Int, Word8) -> V3 Double
-lookupEdge limit isolevel oracle (v,c,b) =
+lookupEdge :: Double -> (V3 Double -> Double) -> (V3 Int, Int, Word8) -> V3 Double
+lookupEdge isolevel oracle (v,c,b) =
   let
     f (x,y) | testBit b x = (y,x)
             | testBit b y = (x,y)
@@ -152,31 +143,10 @@ lookupEdge limit isolevel oracle (v,c,b) =
     p2 = fromGrid isolevel $ v - from b2
   in findPoint isolevel oracle p1 p2
 
---findPoint2 :: Double -> Oracle Double -> V3 Double -> V3 Double -> V3 Double
---findPoint2 isolevel oracle p1 p2 =
-
 findPoint :: Double -> Oracle Double -> V3 Double -> V3 Double -> V3 Double
 findPoint isolevel oracle p1 p2 = snd . last . take 20 $ iterate (subdivide isolevel oracle dir) (p2,p1)
   where dir = normalize $ p2 - p1
 {-# INLINE findPoint #-}
-
-findPoint2 :: Double -> Oracle Double -> V3 Double -> V3 Double -> V3 Double
-findPoint2 isolevel oracle f' t' =
-  let
-    dir = normalize $ t' - f'
-    go d v
---      | abs (d - isolevel) < limit = v
-      | d' > isolevel = go d' v'
-      | otherwise =
-        let
-          p1' = lerp ((d - isolevel) / (d-d')) v v'
-          p2' = lerp ((isolevel - d') / (d-d')) v v'
-          p3' = lerp 0.5 p1' p2'
-        in p3' --go (oracle p3') p3'
-      where
-        v' = v + dir^*(0.1*d)
-        d' = oracle v'
-  in go (oracle f') f'
 
 subdivide :: Double -> Oracle Double -> V3 Double -> (V3 Double, V3 Double) -> (V3 Double, V3 Double)
 subdivide isolevel oracle dir (p1,p2)
@@ -191,36 +161,3 @@ from' = U.fromList corners
 
 from :: Int -> V3 Int
 from i = from' U.! i
-
-stepFire
-  :: forall f. (Corners (f Int), Functor f, Hashable (f Int), Ord (f Int), Num (f Int), U.Unbox (f Int))
-  => Double
-  -> [(Bool, f Double)]
-  -> M.Map (f Int) B
-  -> ( U.Vector (f Int, Word8)
-     , U.Vector (f Int)
-     , M.Map (f Int) B
-     )
-stepFire e ps m =
-  let
-    (m',out) =
-      M.partition squareFilter $ M.unionWith mergeCenters m $
-      M.fromListWith mergeCenters $
-      concatMap (cornerToCenters . fmap (toGrid e)) ps
-    closed' = U.fromList $ map (\(v,B a _ _) -> (v,a)) $ M.toList $ M.filter (\(B _ b _) -> b == mask) out
-    ps' =
-      U.fromList $ S.toList $ S.fromList $
-      concatMap centerToCorners $ M.toList m'
-  in
-    m' `seq` out `seq` (closed',ps',M.map decrementTTL m')
-  where
-    (_cs,mask) = cornersWithMask :: ([f Int],Word8)
-
-    mergeCenters :: B -> B -> B
-    mergeCenters (B a1 b1 _) (B a2 b2 _) = B (a1 .|. a2) (b1 .|. b2) ttl
-
-    squareFilter :: B -> Bool
-    squareFilter (B _ b t) = b /= mask && t /= 0
-
-    decrementTTL :: B -> B
-    decrementTTL (B a b t) = B a b (t-1)

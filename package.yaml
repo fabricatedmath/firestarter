@@ -36,19 +36,9 @@ library:
   ghc-options: -Wall -O2
 
 executables:
-  firestarter-exe:
+  julia-mesh-exe:
     main:                Main.hs
-    source-dirs:         app
-    ghc-options:
-    - -threaded
-    - -rtsopts
-    - -with-rtsopts=-N
-    dependencies:
-    - firestarter
-
-  firestarter-mesh-exe:
-    main:                Main.hs
-    source-dirs:         app/firestarterMesh
+    source-dirs:         app/juliaMesh
     ghc-options:
     - -threaded
     - -rtsopts

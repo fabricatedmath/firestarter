@@ -11,26 +11,63 @@ import qualified Data.Vector.Unboxed as U
 
 import GHC.Float
 
+import System.Console.GetOpt
 import System.IO
 
 import Linear
 
 import System.Environment
+import System.Exit
 
 import JuliaQ
 import Firestarter
 import Lib
 
+startOptions :: Options
+startOptions =
+  Options
+  { optGridSize = 0.005
+  , optFilePrefix = ""
+  }
+
+data Options = Options
+  { optGridSize :: Double
+  , optFilePrefix :: String
+  } deriving Show
+
+options :: [OptDescr (Options -> IO Options)]
+options =
+  [ Option "g" ["gridsize"]
+    (ReqArg
+     (\arg opt -> return opt {optGridSize = read arg})
+     "Double"
+    ) "Grid size to use (default: 0.005)"
+  , Option "p" ["prefix"]
+    (ReqArg
+     (\arg opt -> return opt {optFilePrefix = arg ++ "-"})
+     "String"
+    ) "Prefix for filename"
+  , Option "h" ["help"]
+    (NoArg
+     (\_ -> do
+         prg <- getProgName
+         hPutStrLn stderr $ usageInfo prg options
+         exitWith ExitSuccess
+     )
+    ) "Show help"
+  ]
 main :: IO ()
 main =
   do
-    [gridSizeS,outputFile] <- getArgs
+    args <- getArgs
+    let (actions,_,_) = getOpt RequireOrder options args
+    opts <- foldl (>>=) (return startOptions) actions
     let
-      gridSize = read gridSizeS :: Double --0.005
+      gridSize = optGridSize opts
       j = Julia (V3 2 2 2) gridSize
       (p1,p2) = lastTwoOnGrid j gridSize
+      fileName = optFilePrefix opts ++ show gridSize ++ ".stl"
     chan <- newTChanIO
-    let fileName = outputFile ++ show gridSize ++ ".stl"
     doneVar <- newEmptyMVar
     void $ forkIO $
       do
