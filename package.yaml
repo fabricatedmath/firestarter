@@ -24,7 +24,7 @@ dependencies:
 - mtl
 - transformers
 - linear
-- reflection
+# - reflection
 - containers
 - deepseq
 - hashable
@@ -58,5 +58,4 @@ executables:
     dependencies:
     - firestarter
     - stm
-    - cereal
     - bytestring
