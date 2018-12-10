@@ -33,6 +33,7 @@ dependencies:
 
 library:
   source-dirs: src
+  ghc-options: -Wall -O2
 
 executables:
   firestarter-exe:
@@ -52,6 +53,7 @@ executables:
     - -threaded
     - -rtsopts
     - -Wall
+    - -O2
     - -with-rtsopts=-N
     dependencies:
     - firestarter
