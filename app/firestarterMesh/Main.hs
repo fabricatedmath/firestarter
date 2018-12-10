@@ -1,4 +1,3 @@
-{-# LANGUAGE TupleSections #-}
 module Main (main) where
 
 import Control.Concurrent
@@ -7,7 +6,6 @@ import Control.Monad
 
 import qualified Data.ByteString.Builder as BS
 import Data.Foldable
-import qualified Data.Map.Strict as M
 import Data.Monoid ((<>))
 import qualified Data.Vector.Unboxed as U
 
@@ -22,16 +20,6 @@ import System.Environment
 import JuliaQ
 import Firestarter
 import Lib
-import MarchingCubes
-
-data Model =
-  Model
-  { _firestarter :: Julia
-  , _gridSize :: Double
-  , _map :: M.Map (V3 Int) B
-  , _points :: [(Bool, V3 Double)]
-  , _closed :: [InternalTriangle]
-  } deriving Show
 
 main :: IO ()
 main =
@@ -56,8 +44,8 @@ main =
                 case mv of
                   Just v ->
                     do
-                      print v
-                      BS.hPutBuilder h (putVector v) >> let i' = U.length v + i in i' `seq` go i'
+                      BS.hPutBuilder h (putVector v)
+                      let i' = U.length v + i in i' `seq` go i'
                   Nothing -> return i
           i <- go 0
           hSeek h AbsoluteSeek 80

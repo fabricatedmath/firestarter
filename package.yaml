@@ -21,17 +21,15 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
-- mtl
-- transformers
-- linear
-# - reflection
+- ad
 - containers
 - deepseq
 - hashable
+- linear
+- mtl
 - repa
-- unordered-containers
+- transformers
 - vector
-- ad
 
 library:
   source-dirs: src
