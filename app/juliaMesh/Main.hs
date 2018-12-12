@@ -56,6 +56,7 @@ options =
      )
     ) "Show help"
   ]
+
 main :: IO ()
 main =
   do
@@ -90,12 +91,12 @@ main =
           hClose h
           putMVar doneVar ()
 
-    stepFire' j gridSize [p1,p2] (atomically . writeTChan chan . Just)
+    stepFire j gridSize [p1,p2] (atomically . writeTChan chan . Just)
     atomically $ writeTChan chan Nothing
     _done <- readMVar doneVar
     print "done"
 
-type Triangle = V3 (V3 Float)
+type Triangle a = V3 (V3 a)
 
 putHeader :: BS.Builder
 putHeader = mconcat (replicate 80 $ BS.word8 0)
@@ -103,18 +104,13 @@ putHeader = mconcat (replicate 80 $ BS.word8 0)
 putLength :: Int -> BS.Builder
 putLength = BS.word32LE . fromIntegral
 
-putVector :: U.Vector (V3 Double) -> BS.Builder
-putVector = mconcat . map putTriangle . package . U.toList
+putVector :: U.Vector (Triangle Double) -> BS.Builder
+putVector =
+  mconcat . map putTriangle . U.toList . U.map (fmap fmap fmap double2Float)
 
-putTriangle :: Triangle -> BS.Builder
+putTriangle :: Triangle Float -> BS.Builder
 putTriangle tri =
   putVertex 0 <> fold (fmap putVertex tri) <> BS.word16LE 0
 
 putVertex :: V3 Float -> BS.Builder
 putVertex (V3 x y z) = BS.floatLE x <> BS.floatLE y <> BS.floatLE z
-
-package :: [V3 Double] -> [Triangle]
-package = tripleUp . map (fmap double2Float)
-    where tripleUp (x:y:z:xs) = V3 x y z : tripleUp xs
-          tripleUp [] = []
-          tripleUp _ = error "list doesn't contain a triple multiple"

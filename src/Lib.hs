@@ -4,7 +4,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE Rank2Types #-}
 
-module Lib (stepFire') where
+module Lib (stepFire) where
 
 import Control.DeepSeq
 
@@ -80,13 +80,15 @@ centerToCorners (c,B a b _)
     (cs,mask) = cornersWithMask
     b' = complement $ b .&. mask
 
-stepFire'
+type Triangle a = V3 (V3 a)
+
+stepFire
   :: Julia
   -> Double
   -> [V3 Double]
-  -> (U.Vector (V3 Double) -> IO ())
+  -> (U.Vector (Triangle Double) -> IO ())
   -> IO ()
-stepFire' j e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
+stepFire j e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
   where
     (_cs,mask) = cornersWithMask :: ([V3 Int],Word8)
 
@@ -119,7 +121,7 @@ stepFire' j e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
           m'' = M.map decrementTTL m'
         closed' <-
           fmap R.toUnboxed $ R.computeUnboxedP $
-          R.map (lookupEdge e juliaDistance) $
+          R.map (lookupEdges e juliaDistance) $
           toRepa $ U.fromList $ concatMap toCubeCases $
           M.toList $ M.filter (\(B _ b _) -> b == mask) out
         closed' `deepseq` ps' `deepseq` m'' `deepseq` return ()
@@ -132,7 +134,19 @@ stepFire' j e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
 toRepa :: U.Unbox a => U.Vector a -> R.Array R.U R.DIM1 a
 toRepa v = R.fromUnboxed (R.Z R.:. U.length v) v
 
-lookupEdge :: Double -> (V3 Double -> Double) -> (V3 Int, Int, Word8) -> V3 Double
+lookupEdges
+  :: Double
+  -> (V3 Double -> Double)
+  -> (V3 Int, V3 Int, Word8)
+  -> Triangle Double
+lookupEdges isolevel oracle (v, p, b) =
+  fmap (\i -> lookupEdge isolevel oracle (v, i, b)) p
+
+lookupEdge
+  :: Double
+  -> (V3 Double -> Double)
+  -> (V3 Int, Int, Word8)
+  -> V3 Double
 lookupEdge isolevel oracle (v,c,b) =
   let
     f (x,y) | testBit b x = (y,x)
