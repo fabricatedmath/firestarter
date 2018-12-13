@@ -83,12 +83,63 @@ centerToCorners (c,B a b _)
 type Triangle a = V3 (V3 a)
 
 stepFire
+  :: (Firestarter o V3 Double, U.Unbox a)
+  => o
+  -> (Triangle Double -> a)
+  -> Double
+  -> [V3 Double]
+  -> (U.Vector a -> IO ())
+  -> IO ()
+stepFire j f e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
+  where
+    (_cs,mask) = cornersWithMask :: ([V3 Int],Word8)
+
+    mergeCenters :: B -> B -> B
+    mergeCenters (B a1 b1 _) (B a2 b2 _) = B (a1 .|. a2) (b1 .|. b2) ttl
+
+    squareFilter :: B -> Bool
+    squareFilter (B _ b t) = b /= mask && t /= 0
+
+    decrementTTL :: B -> B
+    decrementTTL (B a b t) = B a b (t-1)
+
+    go :: U.Vector (V3 Int) -> M.Map (V3 Int) B -> IO ()
+    go ps m =
+      do
+        points' <-
+          fmap (concatMap cornerToCenters . R.toList) $ R.computeUnboxedP $
+          R.map
+          ( fmap (toGrid e)
+          . (\p -> (isInside j p,p)) . fromGrid e
+          ) $ toRepa ps
+        let
+          (m', out) =
+            M.partition squareFilter $ M.unionWith mergeCenters m $
+            M.fromListWith mergeCenters $ points'
+          ps' =
+            U.fromList $ S.toList $ S.fromList $
+            concatMap centerToCorners $ M.toList m'
+          toCubeCases (v, B b _ _) = map (\c -> (v,c,b)) $ cubeCasesLookup $ fromIntegral b
+          m'' = M.map decrementTTL m'
+        closed' <-
+          fmap R.toUnboxed $ R.computeUnboxedP $
+          R.map (f . lookupEdges e juliaDistance) $
+          toRepa $ U.fromList $ concatMap toCubeCases $
+          M.toList $ M.filter (\(B _ b _) -> b == mask) out
+        closed' `deepseq` ps' `deepseq` m'' `deepseq` return ()
+        reporter closed'
+        hPutStrLn stderr $ show $ U.length ps
+        case U.null ps' of
+          True -> return ()
+          False -> go ps' m''
+
+stepFire'
   :: Julia
   -> Double
   -> [V3 Double]
   -> (U.Vector (Triangle Double) -> IO ())
   -> IO ()
-stepFire j e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
+stepFire' j e ips reporter = go (U.fromList $ map (toGrid e) ips) M.empty
   where
     (_cs,mask) = cornersWithMask :: ([V3 Int],Word8)
 

@@ -1,13 +1,15 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 module Firestarter where
 
-class Firestarter o f a | o -> f, o -> a where
+class Firestarter o f a where
   isInside :: o -> f a -> Bool
   distanceAndDirection :: o -> f a -> (a, f a)
   startingLocation :: o -> f a
+
+class HasNormal o f a where
+  normal :: o -> f a -> f a
 
 lastTwoOnGrid
   :: (Firestarter o f a, Functor f, Num a, Num (f a))

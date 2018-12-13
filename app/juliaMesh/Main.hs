@@ -2,6 +2,7 @@ module Main (main) where
 
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Lens
 import Control.Monad
 
 import qualified Data.ByteString.Builder as BS
@@ -90,8 +91,8 @@ main =
           BS.hPutBuilder h $ putLength i
           hClose h
           putMVar doneVar ()
-
-    stepFire j gridSize [p1,p2] (atomically . writeTChan chan . Just)
+    let f v = (v, calcNormal v)
+    stepFire j f gridSize [p1,p2] (atomically . writeTChan chan . Just)
     atomically $ writeTChan chan Nothing
     _done <- readMVar doneVar
     print "done"
@@ -104,13 +105,26 @@ putHeader = mconcat (replicate 80 $ BS.word8 0)
 putLength :: Int -> BS.Builder
 putLength = BS.word32LE . fromIntegral
 
-putVector :: U.Vector (Triangle Double) -> BS.Builder
+putVector :: U.Vector (Triangle Double, V3 Double) -> BS.Builder
 putVector =
-  mconcat . map putTriangle . U.toList . U.map (fmap fmap fmap double2Float)
+  mconcat . map putTriangle . U.toList .
+  U.map (\(t,n) -> (fmap fmap fmap double2Float t, fmap double2Float n))
 
-putTriangle :: Triangle Float -> BS.Builder
-putTriangle tri =
-  putVertex 0 <> fold (fmap putVertex tri) <> BS.word16LE 0
+calcNormal
+  :: (Epsilon a, Floating a, Fractional a, RealFloat a)
+  => Triangle a -> V3 a
+calcNormal = juliaAnalyticNormal 100 200 initC . centroid
+  where centroid :: Fractional a => Triangle a -> V3 a
+        centroid t =
+          let
+            x = sum (fmap (^. _x) t) / 3
+            y = sum (fmap (^. _y) t) / 3
+            z = sum (fmap (^. _z) t) / 3
+          in V3 x y z
+
+putTriangle :: (Triangle Float, V3 Float) -> BS.Builder
+putTriangle (tri,n) =
+  putVertex n <> fold (fmap putVertex tri) <> BS.word16LE 0
 
 putVertex :: V3 Float -> BS.Builder
 putVertex (V3 x y z) = BS.floatLE x <> BS.floatLE y <> BS.floatLE z
